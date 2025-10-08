@@ -64,7 +64,7 @@ spec:
             mountPath: /server.key
             subPath: server.key
       containers:
-        - image: bitnami/postgresql:14
+        - image: postgres:17
           name: postgres
           ports:
             - containerPort: 5432
@@ -76,7 +76,7 @@ spec:
             limits:
               memory: 100Mi
           env:
-            - name: POSTGRESQL_PASSWORD
+            - name: POSTGRES_PASSWORD
               value: password
             - name: POSTGRESQL_ENABLE_TLS
               value: "yes"
@@ -87,7 +87,7 @@ spec:
             - name: POSTGRESQL_TLS_CA_FILE
               value: /postgres-tls/ca.crt
           volumeMounts:
-            - mountPath: /bitnami/postgresql
+            - mountPath: /var/lib/postgresql/data
               name: database
             - mountPath: /postgres-tls
               name: postgres-tls-dir
