@@ -12,12 +12,33 @@ data:
   init.sh: |
     #!/bin/sh
     set -e
-    mkdir -p /postgres-tls/var/lib/postgresql
-    cp /ca.crt /postgres-tls/var/lib/postgresql/ca.crt
-    cp /server.crt /postgres-tls/var/lib/postgresql/server.crt
-    cp /server.key /postgres-tls/var/lib/postgresql/server.key
-    chmod 0400 /postgres-tls/var/lib/postgresql/*.crt /postgres-tls/var/lib/postgresql/*.key
+    cp /ca.crt /server.crt /server.key /postgres-tls
+    chmod 0400 /postgres-tls/*
     chown -R 999:999 /postgres-tls
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: postgres-config
+  namespace: postgres
+data:
+  postgresql.conf: |
+    # Basic Configuration
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    
+    # SSL Configuration
+    ssl = on
+    ssl_cert_file = '/postgres-tls/server.crt'
+    ssl_key_file = '/postgres-tls/server.key'
+    ssl_ca_file = '/postgres-tls/ca.crt'
+    ssl_ciphers = 'HIGH:MEDIUM:+3DES:!aNULL'
+    ssl_prefer_server_ciphers = on
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = off
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -40,7 +61,7 @@ spec:
           command:
           - chown
           - -R
-          - 70:70
+          - 999:999
           - /data
           volumeMounts:
           - name: database
@@ -69,6 +90,9 @@ spec:
       containers:
         - image: postgres:17
           name: postgres
+          args:
+            - "-c"
+            - "config_file=/etc/postgresql/postgresql.conf"
           ports:
             - containerPort: 5432
               name: postgres
@@ -88,9 +112,11 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: database
-            - mountPath: /var/lib/postgresql
+            - mountPath: /postgres-tls
               name: postgres-tls-dir
-              subPath: var/lib/postgresql
+            - mountPath: /etc/postgresql/postgresql.conf
+              name: postgres-config
+              subPath: postgresql.conf
           livenessProbe:
             tcpSocket:
               port: 5432
@@ -105,6 +131,9 @@ spec:
         - name: postgres-tls-init
           configMap:
             name: postgres-tls-init
+        - name: postgres-config
+          configMap:
+            name: postgres-config
 ---
 apiVersion: v1
 kind: Service
