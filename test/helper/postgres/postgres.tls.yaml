@@ -14,7 +14,31 @@ data:
     set -e
     cp /ca.crt /server.crt /server.key /postgres-tls
     chmod 0400 /postgres-tls/*
-    chown -R 1001:1001 /postgres-tls
+    chown -R 999:999 /postgres-tls
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: postgres-config
+  namespace: postgres
+data:
+  postgresql.conf: |
+    # Basic Configuration
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    
+    # SSL Configuration
+    ssl = on
+    ssl_cert_file = '/postgres-tls/server.crt'
+    ssl_key_file = '/postgres-tls/server.key'
+    ssl_ca_file = '/postgres-tls/ca.crt'
+    ssl_ciphers = 'HIGH:MEDIUM:+3DES:!aNULL'
+    ssl_prefer_server_ciphers = on
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = off
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -37,7 +61,7 @@ spec:
           command:
           - chown
           - -R
-          - 70:70
+          - 999:999
           - /data
           volumeMounts:
           - name: database
@@ -64,8 +88,11 @@ spec:
             mountPath: /server.key
             subPath: server.key
       containers:
-        - image: bitnami/postgresql:14
+        - image: postgres:17
           name: postgres
+          args:
+            - "-c"
+            - "config_file=/etc/postgresql/postgresql.conf"
           ports:
             - containerPort: 5432
               name: postgres
@@ -76,35 +103,37 @@ spec:
             limits:
               memory: 100Mi
           env:
-            - name: POSTGRESQL_PASSWORD
+            - name: POSTGRES_PASSWORD
               value: password
-            - name: POSTGRESQL_ENABLE_TLS
-              value: "yes"
-            - name: POSTGRESQL_TLS_CERT_FILE
-              value: /postgres-tls/server.crt
-            - name: POSTGRESQL_TLS_KEY_FILE
-              value: /postgres-tls/server.key
-            - name: POSTGRESQL_TLS_CA_FILE
-              value: /postgres-tls/ca.crt
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "scram-sha-256"
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-host=scram-sha-256"
           volumeMounts:
-            - mountPath: /bitnami/postgresql
+            - mountPath: /var/lib/postgresql/data
               name: database
             - mountPath: /postgres-tls
               name: postgres-tls-dir
+            - mountPath: /etc/postgresql/postgresql.conf
+              name: postgres-config
+              subPath: postgresql.conf
           livenessProbe:
             tcpSocket:
               port: 5432
       volumes:
         - name: database
           emptyDir: {}
-        - name:  postgres-tls
+        - name: postgres-tls
           secret:
-            secretName:  postgres-tls
+            secretName: postgres-tls
         - name: postgres-tls-dir
           emptyDir: {}
         - name: postgres-tls-init
           configMap:
             name: postgres-tls-init
+        - name: postgres-config
+          configMap:
+            name: postgres-config
 ---
 apiVersion: v1
 kind: Service
