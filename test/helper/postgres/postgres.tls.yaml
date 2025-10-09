@@ -12,9 +12,12 @@ data:
   init.sh: |
     #!/bin/sh
     set -e
-    cp /ca.crt /server.crt /server.key /postgres-tls
-    chmod 0400 /postgres-tls/*
-    chown -R 1001:1001 /postgres-tls
+    mkdir -p /postgres-tls/var/lib/postgresql
+    cp /ca.crt /postgres-tls/var/lib/postgresql/ca.crt
+    cp /server.crt /postgres-tls/var/lib/postgresql/server.crt
+    cp /server.key /postgres-tls/var/lib/postgresql/server.key
+    chmod 0400 /postgres-tls/var/lib/postgresql/*.crt /postgres-tls/var/lib/postgresql/*.key
+    chown -R 999:999 /postgres-tls
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -78,28 +81,25 @@ spec:
           env:
             - name: POSTGRES_PASSWORD
               value: password
-            - name: POSTGRESQL_ENABLE_TLS
-              value: "yes"
-            - name: POSTGRESQL_TLS_CERT_FILE
-              value: /postgres-tls/server.crt
-            - name: POSTGRESQL_TLS_KEY_FILE
-              value: /postgres-tls/server.key
-            - name: POSTGRESQL_TLS_CA_FILE
-              value: /postgres-tls/ca.crt
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "scram-sha-256"
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-host=scram-sha-256"
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: database
-            - mountPath: /postgres-tls
+            - mountPath: /var/lib/postgresql
               name: postgres-tls-dir
+              subPath: var/lib/postgresql
           livenessProbe:
             tcpSocket:
               port: 5432
       volumes:
         - name: database
           emptyDir: {}
-        - name:  postgres-tls
+        - name: postgres-tls
           secret:
-            secretName:  postgres-tls
+            secretName: postgres-tls
         - name: postgres-tls-dir
           emptyDir: {}
         - name: postgres-tls-init
