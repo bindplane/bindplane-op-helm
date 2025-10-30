@@ -263,14 +263,14 @@ auth:
     scopes: []
 
 image:
-  # -- Image name to be used. Defaults to `ghcr.io/observiq/bindplane-ee`.
+  # -- Image name to be used. Defaults to `observiq/bindplane-ee`.
   name: ""
   # Overrides the image tag whose default is {{ .Chart.AppVersion }}
   # -- Image tag to use. Defaults to the version defined in the Chart's release.
   tag: ""
 
 transform_agent:
-  # -- Transform Agent Image name to be used. Defaults to `ghcr.io/observiq/bindplane-transform-agent`.
+  # -- Transform Agent Image name to be used. Defaults to `observiq/bindplane-transform-agent`.
   name: ""
   # Overrides the image tag whose default is {{ .Chart.AppVersion }}
   # -- Transform Agent Image tag to use. Defaults to latest.
